@@ -460,6 +460,10 @@ first one that is found is returned. Meson versions earlier than
 
 Keyword arguments are the following:
 
+- `native` tells whether to find the executable from the system or use
+  the one defined in the cross file, defaults to `false` and is
+  ignored in non-cross builds
+
 - `required` By default, `required` is set to `true` and Meson will
   abort if no program can be found. If `required` is set to `false`,
   Meson continue even if none of the programs can be found. You can

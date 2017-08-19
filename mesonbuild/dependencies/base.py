@@ -369,8 +369,9 @@ class PkgConfigDependency(ExternalDependency):
 class ExternalProgram:
     windows_exts = ('exe', 'msc', 'com', 'bat')
 
-    def __init__(self, name, command=None, silent=False, search_dir=None):
+    def __init__(self, name, command=None, silent=False, search_dir=None, extra_text=''):
         self.name = name
+        self.extra_text = extra_text
         if command is not None:
             if not isinstance(command, list):
                 self.command = [command]
@@ -381,7 +382,7 @@ class ExternalProgram:
         if not silent:
             if self.found():
                 mlog.log('Program', mlog.bold(name), 'found:', mlog.green('YES'),
-                         '(%s)' % ' '.join(self.command))
+                         '(%s) %s' % (' '.join(self.command), self.extra_text))
             else:
                 mlog.log('Program', mlog.bold(name), 'found:', mlog.red('NO'))
 

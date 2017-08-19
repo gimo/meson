@@ -1,1 +1,1 @@
-executable('test-phony', '../test.c')
+executable('test-PHONY', '../test.c')

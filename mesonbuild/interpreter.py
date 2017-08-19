@@ -1299,7 +1299,7 @@ permitted_kwargs = {'add_global_arguments': {'language'},
                     'custom_target': {'input', 'output', 'command', 'install', 'install_dir', 'build_always', 'capture', 'depends', 'depend_files', 'depfile', 'build_by_default'},
                     'declare_dependency': {'include_directories', 'link_with', 'sources', 'dependencies', 'compile_args', 'link_args', 'version'},
                     'executable': exe_kwargs,
-                    'find_program': {'required'},
+                    'find_program': {'required', 'native'},
                     'generator': {'arguments', 'output', 'depfile'},
                     'include_directories': {'is_system'},
                     'install_data': {'install_dir', 'install_mode', 'sources'},
@@ -1945,13 +1945,24 @@ class Interpreter(InterpreterBase):
                     break
             self.coredata.base_options[optname] = oobj
 
-    @permittedKwargs(permitted_kwargs['find_program'])
-    def func_find_program(self, node, args, kwargs):
-        if not args:
-            raise InterpreterException('No program name specified.')
-        required = kwargs.get('required', True)
-        if not isinstance(required, bool):
-            raise InvalidArguments('"required" argument must be a boolean.')
+    def program_from_cross_file(self, prognames):
+        bins = self.environment.cross_info.config['binaries']
+        for p in prognames:
+            # If the input is the output of e.g. a File object pointing to
+            # a thing then that will not be overridden. Only strings are.
+            # At least we could not come up a use case for this. If you have
+            # one, please file a bug.
+            if isinstance(p, mesonlib.File):
+                continue
+            if not isinstance(p, str):
+                raise InterpreterException('Executable name must be a string.')
+            if p in bins:
+                exename = bins[p]
+                extprog = dependencies.ExternalProgram(p, command=exename, extra_text='from cross file')
+                progobj = ExternalProgramHolder(extprog)
+                return progobj
+
+    def program_from_system(self, args):
         # Search for scripts relative to current subdir.
         # Do not cache found programs because find_program('foobar')
         # might give different results when run from different source dirs.
@@ -1974,8 +1985,25 @@ class Interpreter(InterpreterBase):
             progobj = ExternalProgramHolder(extprog)
             if progobj.found():
                 return progobj
-        if required and not progobj.found():
+
+    @permittedKwargs(permitted_kwargs['find_program'])
+    def func_find_program(self, node, args, kwargs):
+        if not args:
+            raise InterpreterException('No program name specified.')
+        required = kwargs.get('required', True)
+        if not isinstance(required, bool):
+            raise InvalidArguments('"required" argument must be a boolean.')
+        progobj = None
+        if self.build.environment.is_cross_build():
+            use_native = kwargs.get('native', False)
+            if not use_native:
+                progobj = self.program_from_cross_file(args)
+        if progobj is None:
+            progobj = self.program_from_system(args)
+        if required and (progobj is None or not progobj.found()):
             raise InvalidArguments('Program "%s" not found or not executable' % exename)
+        if progobj is None:
+            return ExternalProgramHolder(dependencies.ExternalProgram('nonexistingprogram'))
         return progobj
 
     def func_find_library(self, node, args, kwargs):
